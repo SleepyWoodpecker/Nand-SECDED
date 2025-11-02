@@ -69,7 +69,6 @@ def generate_decode_matrix(parity_matrices, num_parity_bits):
             decode_matrix_chunks.append(int(decode_matrix_string[idx : idx + 32], 2))
         chunked_decode_matrix.append(decode_matrix_chunks)
 
-    print(chunked_decode_matrix)
     return chunked_decode_matrix
 
 
@@ -100,7 +99,6 @@ def bit_sum(num):
 
 
 def encode_message(message, encoding_matrix):
-    # TODO: add overall parity
     encoded_message = ""
     for val_list in encoding_matrix:
         for i, val in enumerate(val_list):
@@ -109,7 +107,7 @@ def encode_message(message, encoding_matrix):
             )
 
     # add the overall parity
-    # encoded_message = str(bit_sum(int(message, 2))) + encoded_message
+    encoded_message = str(bit_sum(int(message, 2))) + encoded_message
 
     return encoded_message
 
@@ -117,7 +115,7 @@ def encode_message(message, encoding_matrix):
 def decode_message(
     encoded_message, decoding_matrix, num_parity_bits, transposed_decode_matrix
 ):
-    # encoded_message = encoded_message[1:]
+    encoded_message = encoded_message[1:]
     error_val = ""
     for val_list in decoding_matrix:
         local_sum = 0
@@ -130,15 +128,17 @@ def decode_message(
     assert num_parity_bits == len(error_val)
 
     error_location_idx = transposed_decode_matrix.index(int(error_val, 2))
+    corrected_message = False
     if error_location_idx:
         print("Error at bit", error_location_idx - 1)
         encoded_message = flip_bit(encoded_message, error_location_idx - 1)
+        corrected_message = True
     else:
         print("No error detected!")
 
     message = encoded_message[num_parity_bits:]
 
-    return message
+    return message, corrected_message
 
 
 def flip_bit(message, bit_to_flip):
@@ -154,6 +154,14 @@ def flip_bit(message, bit_to_flip):
         )
 
     return message_copy
+
+
+def overall_parity_check(message):
+    overall_parity = int(message[0])
+    for bit in message:
+        overall_parity ^= int(bit)
+
+    return overall_parity == 0
 
 
 def main():
@@ -201,14 +209,19 @@ def main():
     encoded_message = flip_bit(encoded_message, bit_to_flip)
     print(encoded_message)
 
-    original_message = decode_message(
+    # first check parity of the entire message
+    overall_parity_valid = overall_parity_check(encoded_message)
+
+    original_message, corrected = decode_message(
         encoded_message,
         decoding_matrix=decoding_matrix,
         num_parity_bits=num_parity_bits,
         transposed_decode_matrix=transposed_decode_matrix,
     )
 
-    print(f"The original message is: {original_message}")
+    print(
+        f"Overall parity is: {"Valid" if (overall_parity_valid and not corrected) or (not overall_parity_valid and corrected) else "Invalid" } | The original message is: {original_message}"
+    )
 
 
 if __name__ == "__main__":
