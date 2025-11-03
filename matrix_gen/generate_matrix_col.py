@@ -394,18 +394,15 @@ def decode_message(encoded_message, decoding_matrix, num_parity_bits):
             local_sum ^= bit_sum(val & int(encoded_message[i * 32 : (i + 1) * 32], 2))
 
         error_val += str(local_sum)
-    print(error_val)
 
     assert num_parity_bits == len(error_val)
 
     error_location_idx = get_decode_position(int(error_val, 2))
     corrected_message = False
     if error_location_idx:
-        print("Error at bit", error_location_idx - 1)
+        # print("Error at bit", error_location_idx - 1)
         encoded_message = flip_bit(encoded_message, error_location_idx - 1)
         corrected_message = True
-    else:
-        print("No error detected!")
 
     message = encoded_message[num_parity_bits:]
 
@@ -429,15 +426,52 @@ def flip_bit(message, bit_to_flip):
 
 def overall_parity_check(message):
     overall_parity = int(message[0])
-    for bit in message:
+    for bit in message[1:]:
         overall_parity ^= int(bit)
 
     return overall_parity == 0
 
 
 def test_hamming(
-    encoded_word_bits, num_parity_bits, num_data_bits, message, bit_to_flip=None
+    encoding_matrix,
+    decoding_matrix,
+    num_parity_bits,
+    message,
+    bit_to_flip=None,
+    second_bit_to_flip=None,
 ):
+
+    encoded_message = encode_message(message, encoding_matrix=encoding_matrix)
+
+    if bit_to_flip != None:
+        encoded_message = flip_bit(encoded_message, bit_to_flip)
+
+        if second_bit_to_flip != None:
+            encoded_message = flip_bit(encoded_message, second_bit_to_flip)
+
+    # first check parity of the entire message
+    overall_parity_valid = overall_parity_check(encoded_message)
+
+    original_message, corrected = None, None
+    try:
+        original_message, corrected = decode_message(
+            encoded_message,
+            decoding_matrix=decoding_matrix,
+            num_parity_bits=num_parity_bits,
+        )
+    except IndexError:
+        if second_bit_to_flip != None:
+            return False, "", False
+
+    return overall_parity_valid, original_message, corrected
+
+
+def main():
+    encoded_word_bits = 256 + 9 + 1
+    num_parity_bits = 9
+    num_data_bits = 256
+    message = "1010110101100110000000101101100001000111110011100011000110001011010000111001111101101100000111111101000000100011110101110111011111011010001011010000101001010111100011001110000010011110100110110100110001100011000001100011100110111000110111000001010100101011"
+
     parity_matrices = []
     for i in range(num_parity_bits):
         parity_matrices.append(
@@ -458,46 +492,39 @@ def test_hamming(
         parity_matrices=parity_matrices, num_parity_bits=num_parity_bits
     )
 
-    encoded_message = encode_message(message, encoding_matrix=encoding_matrix)
-
-    if bit_to_flip != None:
-        encoded_message = flip_bit(encoded_message, bit_to_flip)
-
-    # first check parity of the entire message
-    overall_parity_valid = overall_parity_check(encoded_message)
-
-    original_message, corrected = decode_message(
-        encoded_message,
-        decoding_matrix=decoding_matrix,
-        num_parity_bits=num_parity_bits,
-    )
-
-    if corrected:
-        overall_parity_valid = overall_parity_check(original_message)
-
-    return overall_parity_valid, original_message, corrected
-
-
-def main():
-    encoded_word_bits = 256 + 9 + 1
-    num_parity_bits = 9
-    num_data_bits = 256
-    message = "1010110101100110000000101101100001000111110011100011000110001011010000111001111101101100000111111101000000100011110101110111011111011010001011010000101001010111100011001110000010011110100110110100110001100011000001100011100110111000110111000001010100101011"
-
+    # test single bit flips
     for i in range(266):
         overall_parity_valid, original_message, corrected = test_hamming(
-            encoded_word_bits=encoded_word_bits,
+            encoding_matrix=encoding_matrix,
+            decoding_matrix=decoding_matrix,
             num_parity_bits=num_parity_bits,
-            num_data_bits=num_data_bits,
             message=message,
             bit_to_flip=i,
         )
 
         assert original_message == message
+        assert not overall_parity_valid
+        if i != 0:
+            assert corrected
+        else:
+            assert not corrected
 
-        # print(
-        #     f"Overall parity is: {"Valid" if (overall_parity_valid and not corrected) or (not overall_parity_valid and corrected) else "Invalid" } | The original message is: {original_message}"
-        # )
+    # test all possible double bit flips
+    for i in range(0, 266):
+        for j in range(i + 1, 266):
+            overall_parity_valid, original_message, corrected = test_hamming(
+                encoding_matrix=encoding_matrix,
+                decoding_matrix=decoding_matrix,
+                num_parity_bits=num_parity_bits,
+                message=message,
+                bit_to_flip=i,
+                second_bit_to_flip=j,
+            )
+
+            has_error = (corrected and overall_parity_valid) or (
+                not corrected and not overall_parity_valid
+            )
+            assert has_error, f"Bit 1: {i}, Bit 2: {j} "
 
 
 if __name__ == "__main__":

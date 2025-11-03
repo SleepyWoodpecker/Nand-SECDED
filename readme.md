@@ -6,3 +6,4 @@ References:
 
 - Algorithm for matrix multiplication obtained from: https://michaeldipperstein.github.io/hamming.html
 - Generator matrix corss referred with data from: http://www.mathaddict.net/hamming.htm
+- Nice visual explanation for what is going on: https://www.youtube.com/watch?v=X8jsijhllIA
