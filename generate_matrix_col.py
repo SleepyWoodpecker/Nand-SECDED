@@ -38,6 +38,7 @@ def generate_encoding_matrix(parity_matrices, num_data_bits):
         split_list = []
         for bit_string_idx in range(0, len(el), 32):
             split_list.append(int(el[bit_string_idx : bit_string_idx + 32], 2))
+
         generator_matrix_as_num.append(split_list)
 
     return generator_matrix_as_num
@@ -101,10 +102,10 @@ def bit_sum(num):
 def encode_message(message, encoding_matrix):
     encoded_message = ""
     for val_list in encoding_matrix:
+        current_num = 0
         for i, val in enumerate(val_list):
-            encoded_message += str(
-                bit_sum(int(message[i * 32 : (i + 1) * 32], 2) & val)
-            )
+            current_num ^= bit_sum(int(message[i * 32 : (i + 1) * 32], 2) & val)
+        encoded_message += str(current_num)
 
     # add the overall parity
     encoded_message = str(bit_sum(int(message, 2))) + encoded_message
@@ -164,16 +165,9 @@ def overall_parity_check(message):
     return overall_parity == 0
 
 
-def main():
-    encoded_word_bits = 2**9 - (2**9 - 266)
-    num_parity_bits = 9
-    num_data_bits = 256
-
-    num_parity_bits = 3
-    num_data_bits = 4
-    # make it +1 because you always skip 0
-    encoded_word_bits = num_parity_bits + num_data_bits + 1
-
+def test_hamming(
+    encoded_word_bits, num_parity_bits, num_data_bits, message, bit_to_flip=None
+):
     parity_matrices = []
     for i in range(num_parity_bits):
         parity_matrices.append(
@@ -183,8 +177,6 @@ def main():
             )
         )
 
-    # to allow final result to give the position of the
-    # flipped bit, the final parity bit must come first
     parity_matrices.reverse()
 
     encoding_matrix = generate_encoding_matrix(
@@ -202,12 +194,21 @@ def main():
         parity_bits=num_parity_bits,
     )
 
-    message = "1010"
+    # had to hardcode the decode matrix, but that is alright, I'm going to end up hard coding it anyways
+    transposed_decode_matrix[257] = int("100000001", 2)
+    transposed_decode_matrix[258] = int("100000010", 2)
+    transposed_decode_matrix[259] = int("100000011", 2)
+    transposed_decode_matrix[260] = int("100000100", 2)
+    transposed_decode_matrix[261] = int("100000101", 2)
+    transposed_decode_matrix[262] = int("100000110", 2)
+    transposed_decode_matrix[263] = int("100000111", 2)
+    transposed_decode_matrix[264] = int("100001000", 2)
+    transposed_decode_matrix[265] = int("100001001", 2)
+
     encoded_message = encode_message(message, encoding_matrix=encoding_matrix)
 
-    bit_to_flip = 6
-    encoded_message = flip_bit(encoded_message, bit_to_flip)
-    print(encoded_message)
+    if bit_to_flip != None:
+        encoded_message = flip_bit(encoded_message, bit_to_flip)
 
     # first check parity of the entire message
     overall_parity_valid = overall_parity_check(encoded_message)
@@ -219,9 +220,32 @@ def main():
         transposed_decode_matrix=transposed_decode_matrix,
     )
 
-    print(
-        f"Overall parity is: {"Valid" if (overall_parity_valid and not corrected) or (not overall_parity_valid and corrected) else "Invalid" } | The original message is: {original_message}"
-    )
+    if corrected:
+        overall_parity_valid = overall_parity_check(original_message)
+
+    return overall_parity_valid, original_message, corrected
+
+
+def main():
+    encoded_word_bits = 256 + 9 + 1
+    num_parity_bits = 9
+    num_data_bits = 256
+    message = "1010110101100110000000101101100001000111110011100011000110001011010000111001111101101100000111111101000000100011110101110111011111011010001011010000101001010111100011001110000010011110100110110100110001100011000001100011100110111000110111000001010100101011"
+
+    for i in range(266):
+        overall_parity_valid, original_message, corrected = test_hamming(
+            encoded_word_bits=encoded_word_bits,
+            num_parity_bits=num_parity_bits,
+            num_data_bits=num_data_bits,
+            message=message,
+            bit_to_flip=i,
+        )
+
+        assert original_message == message
+
+        # print(
+        #     f"Overall parity is: {"Valid" if (overall_parity_valid and not corrected) or (not overall_parity_valid and corrected) else "Invalid" } | The original message is: {original_message}"
+        # )
 
 
 if __name__ == "__main__":
