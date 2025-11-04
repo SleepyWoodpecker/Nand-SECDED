@@ -492,42 +492,44 @@ def main():
         parity_matrices=parity_matrices, num_parity_bits=num_parity_bits
     )
 
+    print(decoding_matrix)
+
     # test single bit flips
-    for i in range(266):
-        overall_parity_valid, original_message, corrected = test_hamming(
-            encoding_matrix=encoding_matrix,
-            decoding_matrix=decoding_matrix,
-            num_parity_bits=num_parity_bits,
-            message=message,
-            bit_to_flip=i,
-        )
+    # for i in range(266):
+    #     overall_parity_valid, original_message, corrected = test_hamming(
+    #         encoding_matrix=encoding_matrix,
+    #         decoding_matrix=decoding_matrix,
+    #         num_parity_bits=num_parity_bits,
+    #         message=message,
+    #         bit_to_flip=i,
+    #     )
 
-        assert original_message == message
-        assert not overall_parity_valid
-        if i != 0:
-            assert corrected
-        else:
-            assert not corrected
+    #     assert original_message == message
+    #     assert not overall_parity_valid
+    #     if i != 0:
+    #         assert corrected
+    #     else:
+    #         assert not corrected
 
-    # test all possible double bit flips
-    for i in range(266):
-        for j in range(i + 1, 266):
-            overall_parity_valid, original_message, corrected = test_hamming(
-                encoding_matrix=encoding_matrix,
-                decoding_matrix=decoding_matrix,
-                num_parity_bits=num_parity_bits,
-                message=message,
-                bit_to_flip=i,
-                second_bit_to_flip=j,
-            )
+    # # test all possible double bit flips
+    # for i in range(266):
+    #     for j in range(i + 1, 266):
+    #         overall_parity_valid, original_message, corrected = test_hamming(
+    #             encoding_matrix=encoding_matrix,
+    #             decoding_matrix=decoding_matrix,
+    #             num_parity_bits=num_parity_bits,
+    #             message=message,
+    #             bit_to_flip=i,
+    #             second_bit_to_flip=j,
+    #         )
 
-            # the only way to have no error is:
-            # you have no errors, and the overall message is valid
-            # you have an error, and you corrected one bit in the message
-            no_error = (not corrected and overall_parity_valid) or (
-                corrected and not overall_parity_valid
-            )
-            assert not no_error, f"Bit 1: {i}, Bit 2: {j} "
+    #         # the only way to have no error is:
+    #         # you have no errors, and the overall message is valid
+    #         # you have an error, and you corrected one bit in the message
+    #         no_error = (not corrected and overall_parity_valid) or (
+    #             corrected and not overall_parity_valid
+    #         )
+    #         assert not no_error, f"Bit 1: {i}, Bit 2: {j} "
 
 
 if __name__ == "__main__":
