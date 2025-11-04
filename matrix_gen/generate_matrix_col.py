@@ -510,7 +510,7 @@ def main():
             assert not corrected
 
     # test all possible double bit flips
-    for i in range(0, 266):
+    for i in range(266):
         for j in range(i + 1, 266):
             overall_parity_valid, original_message, corrected = test_hamming(
                 encoding_matrix=encoding_matrix,
@@ -521,10 +521,13 @@ def main():
                 second_bit_to_flip=j,
             )
 
-            has_error = (corrected and overall_parity_valid) or (
-                not corrected and not overall_parity_valid
+            # the only way to have no error is:
+            # you have no errors, and the overall message is valid
+            # you have an error, and you corrected one bit in the message
+            no_error = (not corrected and overall_parity_valid) or (
+                corrected and not overall_parity_valid
             )
-            assert has_error, f"Bit 1: {i}, Bit 2: {j} "
+            assert not no_error, f"Bit 1: {i}, Bit 2: {j} "
 
 
 if __name__ == "__main__":
