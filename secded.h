@@ -15,4 +15,6 @@ extern const uint16_t error_location[];
 uint16_t encode_256(const uint32_t *raw_data);
 void decode_256(const uint8_t *raw_data, uint8_t *decoded_data);
 
+uint8_t bit_sequence_parity(uint32_t input);
+
 #endif

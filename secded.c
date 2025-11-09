@@ -2,15 +2,14 @@
 
 #include <stdint.h>
 
-static uint8_t bit_sequence_parity(uint32_t input);
 
-uint16_t encode_256(const uint32_t *raw_data) {
+uint16_t encode_256(const uint32_t raw_data[]) {
   // calculate parity bits for data
   uint16_t parity_bits = 0;
   for (int i = 0; i < NUM_PARITY_BITS; ++i) {
     int sequence_parity = 0;
     for (int j = 0; j < PARITY_GENERATOR_NUM_32_BIT_COLS; ++j) {
-      sequence_parity ^= bit_sequence_parity(*raw_data & parity_generator_idxs[i][j]);
+      sequence_parity ^= bit_sequence_parity(raw_data[j] & parity_generator_idxs[i][j]);
     }
     parity_bits <<= 1;
     parity_bits |= sequence_parity;
@@ -21,7 +20,7 @@ uint16_t encode_256(const uint32_t *raw_data) {
 }
 
 // TODO: there should be some way to test this later on
-static uint8_t bit_sequence_parity(uint32_t input) {
+uint8_t bit_sequence_parity(uint32_t input) {
   uint8_t sequence_parity = 0;
   for (int i = 0; i < 32; ++i) {
     sequence_parity ^=  input & 0b1;
