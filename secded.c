@@ -8,7 +8,7 @@ uint16_t encode_256(const uint32_t raw_data[]) {
   uint16_t parity_bits = 0;
   for (int i = 0; i < NUM_PARITY_BITS; ++i) {
     int sequence_parity = 0;
-    for (int j = 0; j < PARITY_GENERATOR_NUM_32_BIT_COLS; ++j) {
+    for (int j = 0; j < NUM_32_BIT_COLS_IN_BLOCK; ++j) {
       sequence_parity ^= bit_sequence_parity(raw_data[j] & parity_generator_idxs[i][j]);
     }
     parity_bits <<= 1;
@@ -17,6 +17,17 @@ uint16_t encode_256(const uint32_t raw_data[]) {
 
   // expect 9 bits to come back from parity encoding
   return parity_bits & 0x1ff;
+}
+
+uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_bits) {
+  uint16_t current_parity_sum = 0;
+  for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
+    current_parity_sum ^= bit_sequence_parity(raw_data[i]);
+  }
+
+  current_parity_sum ^= bit_sequence_parity(parity_bits);
+
+  return current_parity_sum;
 }
 
 // TODO: there should be some way to test this later on
@@ -30,7 +41,7 @@ uint8_t bit_sequence_parity(uint32_t input) {
   return sequence_parity;
 }
 
-const uint32_t parity_generator_idxs[NUM_PARITY_BITS][PARITY_GENERATOR_NUM_32_BIT_COLS] = {
+const uint32_t parity_generator_idxs[NUM_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] = {
   {0, 0, 0, 0, 0, 0, 0, 511},
   {0, 0, 0, 255, 4294967295, 4294967295, 4294967295, 4294966784},
   {0, 127, 4294967295, 4294967040, 0, 511, 4294967295, 4294966784},
