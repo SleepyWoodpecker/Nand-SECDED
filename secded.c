@@ -73,6 +73,35 @@ void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeRes
   return;
 }
 
+bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response) {
+  // the only way there would be no errors in the message is if:
+  // overall parity has error and 1 bit was flipped
+  // overall parity no error and no bit was flipped
+  if (decode_response->response_flags == 0 && decode_response->bit_position_to_correct == 0) {
+    return true;
+  }
+  else if (decode_response->response_flags == (BIT_CORRECTED | OVERALL_PARITY_INVALID)) {
+    uint16_t data_bit_to_correct = decode_response->bit_position_to_correct;
+
+    // if it is a parity bit, just return normally
+    if (data_bit_to_correct < 10) {
+      return true;
+    }
+
+    // offset from parity bits
+    data_bit_to_correct -= 10;
+    // divide by 32
+    uint16_t column_to_flip = data_bit_to_correct >> 5;
+    // get data_bit_to_correct % 32
+    uint16_t position_to_flip = data_bit_to_correct & 0b11111;
+
+    raw_data[column_to_flip] ^= (1 << (31 - position_to_flip));
+    return true;
+  }
+
+  return false;
+}
+
 const uint32_t parity_generator_idxs[NUM_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] = {
   {0, 0, 0, 0, 0, 0, 0, 511},
   {0, 0, 0, 255, 4294967295, 4294967295, 4294967295, 4294966784},

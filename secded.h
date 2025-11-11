@@ -26,7 +26,7 @@ typedef struct {
 uint16_t encode_256(const uint32_t raw_data[]);
 uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_bits);
 void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeResponse_t *decode_response);
-bool decode_message(DecodeResponse_t *decode_response);
+bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response);
 
 uint8_t bit_sequence_parity(uint32_t input);
 

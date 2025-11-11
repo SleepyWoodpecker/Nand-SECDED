@@ -4,6 +4,8 @@
 
 #include "secded.h"
 
+bool check_array(uint32_t decoded_message[]);
+
 void test_bit_sequence_parity() {
     uint16_t test = 0b1001001;
     assert(bit_sequence_parity(test) == 0b1 && "Able to correct for odd parity");
@@ -33,18 +35,11 @@ void test_overall_parity() {
     assert(overall_parity == 0b0 && "Overall parity bit does not match");
 }
 
-void test_decode() {
-    uint32_t message[] = {2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
-    uint16_t parity_bits = encode_256(message);
-    uint16_t overall_parity = encode_overall_parity(message, parity_bits);
-
-    uint16_t parity_sequence = overall_parity << NUM_PARITY_BITS | parity_bits;
-
+/*
+Test all possible combinations of single bit flips
+*/
+void test_single_bit_flip(uint32_t message[], uint16_t parity_sequence) {
     DecodeResponse_t decode_response;
-    decode_256(message, parity_sequence, &decode_response);
-
-    assert(decode_response.response_flags == 0 && decode_response.bit_position_to_correct == 0 && "No error detected when there is no bit flip");
-
     // test the flipping of the overall parity_bit
     parity_sequence ^= 1 << NUM_PARITY_BITS;
     decode_256(message, parity_sequence, &decode_response);
@@ -65,9 +60,112 @@ void test_decode() {
             message[i] ^= 1 << (32 - 1 - j);
             decode_256(message, parity_sequence, &decode_response);
             assert(decode_response.response_flags == (OVERALL_PARITY_INVALID | BIT_CORRECTED) && decode_response.bit_position_to_correct == i * 32 + j + 10 && "Detects error when a message bit is flipped");
+            assert(resolve_decode(message, &decode_response) && "Message is still valid after a bit has been flipped");
+            assert(check_array(message) && "Original message can still be recovered");
+        }
+    }
+}
+
+/*
+Test all possible combination of double bit flips
+*/
+void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
+    // test flipping 2 bits
+    // start with the parity bit first
+    DecodeResponse_t decode_response;
+
+    parity_sequence ^= 1 << NUM_PARITY_BITS;
+    for (int i = 0; i < NUM_PARITY_BITS; ++i) {
+        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+        decode_256(message, parity_sequence, &decode_response);
+        assert(!resolve_decode(message, &decode_response) && "Message should not be valid when overall parity bit and parity bit have been flipped");
+        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+    }
+
+    // test the flipping of every bit in the message
+    for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
+        for (int j = 0; j < 32; ++j) {
+            message[i] ^= 1 << (32 - 1 - j);
+            decode_256(message, parity_sequence, &decode_response);
+            assert(!resolve_decode(message, &decode_response) && "Message should not be valid after parity bit and data bit have been flipped");
+            assert(!check_array(message) && "Array should no longer be valid");
             message[i] ^= 1 << (32 - 1 - j);
         }
     }
+    parity_sequence ^= 1 << NUM_PARITY_BITS;
+
+    // test flipping one of the other parity bits
+    for (int i = 0; i < NUM_PARITY_BITS; ++i) {
+        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+
+        for (int j = i + 1; j < NUM_PARITY_BITS; ++j) {
+            parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - j);
+            decode_256(message, parity_sequence, &decode_response);
+            assert(!resolve_decode(message, &decode_response) && "Message should no longer be valid when two parity bits have been flipped");
+            parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - j);
+        }
+
+        for (int k = 0; k < NUM_32_BIT_COLS_IN_BLOCK; ++k) {
+            for (int j = 0; j < 32; ++j) {
+                message[k] ^= 1 << (32 - 1 - j);
+                decode_256(message, parity_sequence, &decode_response);
+                assert(!resolve_decode(message, &decode_response) && "Message should no longer be valid when a parity bit and a data bit have been flipped");
+                assert(!check_array(message) && "Array should no longer be valid");
+                message[k] ^= 1 << (32 - 1 - j);
+            }
+        }
+
+        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+    }
+
+    assert(check_array(message));
+
+    // test flipping of 2 data bits
+    for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
+        for (int ii = 0; ii < 32; ++ii) {
+            message[i] ^= 1 << (32 - 1 - ii);
+
+            for (int k = 0; k < NUM_32_BIT_COLS_IN_BLOCK; ++k) {
+                for (int j = 0; j < 32; ++j) {
+                    // avoid flipping the same bit twice
+                    if (i == k && ii == j) {
+                        continue;
+                    }
+
+                    message[k] ^= 1 << (32 - 1 - j);
+                    decode_256(message, parity_sequence, &decode_response);
+                    assert(!resolve_decode(message, &decode_response) && "Message should no longer be valid when a parity bit and a data bit have been flipped");
+                    assert(!check_array(message) && "Array should no longer be valid");
+                    message[k] ^= 1 << (32 - 1 - j);
+                }
+            }
+
+            message[i] ^= 1 << (32 - 1 - ii);
+        }
+    }
+}
+
+/*
+Test the decode function by checking that:
+1. No error is raised when there are no bit flips
+2. Single bit flip can be corrected and no error is raised
+3. Double bit flips cannot be corrected and error is raised
+*/
+void test_decode() {
+    uint32_t message[] = {2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
+    uint16_t parity_bits = encode_256(message);
+    uint16_t overall_parity = encode_overall_parity(message, parity_bits);
+
+    uint16_t parity_sequence = overall_parity << NUM_PARITY_BITS | parity_bits;
+
+    DecodeResponse_t decode_response;
+    decode_256(message, parity_sequence, &decode_response);
+
+    assert(decode_response.response_flags == 0 && decode_response.bit_position_to_correct == 0 && "No error detected when there is no bit flip");
+
+    test_single_bit_flip(message, parity_sequence);
+    test_double_bit_flip(message, parity_sequence);
+    
 }
 
 int main(void) { 
@@ -75,4 +173,15 @@ int main(void) {
     test_encoding(); 
     test_overall_parity();
     test_decode();
+}
+
+bool check_array(uint32_t decoded_message[]) {
+    uint32_t message[] = {2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
+    for (int i = 0; i < 8; ++i) {
+        if (message[i] != decoded_message[i]) {
+            return false;
+        }
+    }
+
+    return true;
 }
