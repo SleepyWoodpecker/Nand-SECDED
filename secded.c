@@ -2,6 +2,15 @@
 
 #include <stdint.h>
 
+#include <stdio.h>
+
+uint16_t get_message_parity(const uint32_t raw_data[]) {
+  uint16_t current_parity_sum = 0;
+  for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
+    current_parity_sum ^= bit_sequence_parity(raw_data[i]);
+  }
+  return current_parity_sum;
+}
 
 uint16_t encode_256(const uint32_t raw_data[]) {
   // calculate parity bits for data
@@ -20,12 +29,9 @@ uint16_t encode_256(const uint32_t raw_data[]) {
 }
 
 uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_bits) {
-  uint16_t current_parity_sum = 0;
-  for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
-    current_parity_sum ^= bit_sequence_parity(raw_data[i]);
-  }
-
-  current_parity_sum ^= bit_sequence_parity(parity_bits);
+  uint16_t current_parity_sum = get_message_parity(raw_data);
+  uint16_t sequence_parity_bits = parity_bits & 0b111111111;
+  current_parity_sum ^= bit_sequence_parity(sequence_parity_bits);
 
   return current_parity_sum;
 }
@@ -41,6 +47,32 @@ uint8_t bit_sequence_parity(uint32_t input) {
   return sequence_parity;
 }
 
+void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeResponse_t *decode_response) {
+  // remove the parity bit, since it is not used to determine the position of the flipped bit
+  uint16_t overall_parity_bit = parity_bits >> NUM_PARITY_BITS;
+  uint16_t decode_parity_bits = parity_bits & 0b111111111;
+
+  uint16_t overall_bit_sum = 0;
+  for (int i = 0; i < NUM_PARITY_BITS; ++i) {
+    uint16_t local_bit_sum = bit_sequence_parity(decode_parity_bits & decode_matrix[i][0]);
+    for (int j = 1; j < NUM_COLS_IN_DECODE_MATRIX; ++j) {
+      local_bit_sum ^= bit_sequence_parity(raw_data[j - 1] & decode_matrix[i][j]);
+    }
+
+    overall_bit_sum <<= 1;
+    overall_bit_sum |= local_bit_sum;
+  }
+ 
+  decode_response->response_flags = (
+    ((error_location[overall_bit_sum] != 0) ? BIT_CORRECTED : 0) | 
+    ((overall_parity_bit != encode_overall_parity(raw_data, parity_bits)) ? OVERALL_PARITY_INVALID : 0)
+  );
+
+  decode_response->bit_position_to_correct = error_location[overall_bit_sum];
+
+  return;
+}
+
 const uint32_t parity_generator_idxs[NUM_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] = {
   {0, 0, 0, 0, 0, 0, 0, 511},
   {0, 0, 0, 255, 4294967295, 4294967295, 4294967295, 4294966784},
@@ -54,16 +86,16 @@ const uint32_t parity_generator_idxs[NUM_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] 
 };
 
 // last number should not be 32 bits :/
-const uint32_t decode_matrix[][9] = {
-  {2147483648, 0, 0, 0, 0, 0, 0, 0, 511},
-  {1073741824, 0, 0, 0, 2147483647, 4294967295, 4294967295, 4294967295, 0},
-  {536870912, 0, 1073741823, 4294967295, 2147483648, 0, 4294967295, 4294967295, 0},
-  {268435456, 536870911, 3221225472, 2147483647, 2147483648, 4294967295, 0, 4294967295, 0},
-  {134221823, 3758112767, 3221258239, 2147516415, 2147549183, 65535, 65535, 65535, 0},
-  {67629087, 3762274367, 3229581439, 2155839615, 2164195583, 16711935, 16711935, 16711935, 3},
-  {37286369, 3821257667, 3347548039, 2273806215, 2400128783, 252645135, 252645135, 252645135, 60},
-  {22754918, 1825361100, 3650722201, 2576980377, 3006477107, 858993459, 858993459, 858993459, 204},
-  {15555242, 3042268501, 1789569706, 2863311530, 3579139413, 1431655765, 1431655765, 1431655765, 341}
+const uint32_t decode_matrix[][NUM_COLS_IN_DECODE_MATRIX] = {
+  {256, 0, 0, 0, 0, 0, 0, 0, 511}, 
+  {128, 0, 0, 0, 255, 4294967295, 4294967295, 4294967295, 4294966784}, 
+  {64, 0, 127, 4294967295, 4294967040, 0, 511, 4294967295, 4294966784}, 
+  {32, 63, 4294967168, 255, 4294967040, 511, 4294966784, 511, 4294966784}, 
+  {16, 2097088, 8388480, 16776960, 16776960, 33553920, 33553920, 33553920, 33553920}, 
+  {8, 266354624, 2139127680, 4278255360, 4278255361, 4261543425, 4261543425, 4261543425, 4261543427}, 
+  {4, 1910752199, 2273806223, 252645135, 252645150, 505290270, 505290270, 505290270, 505290300}, 
+  {2, 3060583641, 2576980403, 858993459, 858993510, 1717986918, 1717986918, 1717986918, 1717987020}, 
+  {1, 3669316970, 2863311573, 1431655765, 1431655850, 2863311530, 2863311530, 2863311530, 2863311701}
 };
 
 const uint16_t error_location[] = {
