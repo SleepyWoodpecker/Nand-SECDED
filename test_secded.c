@@ -6,14 +6,6 @@
 
 bool check_array(uint32_t decoded_message[]);
 
-void test_bit_sequence_parity() {
-    uint16_t test = 0b1001001;
-    assert(bit_sequence_parity(test) == 0b1 && "Able to correct for odd parity");
-
-    test = 0b1000100;
-    assert(bit_sequence_parity(test) == 0b0 && "Able to correct for even parity");
-}
-
 void test_encoding() {
     uint32_t message[] = {2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
 
@@ -41,17 +33,17 @@ Test all possible combinations of single bit flips
 void test_single_bit_flip(uint32_t message[], uint16_t parity_sequence) {
     DecodeResponse_t decode_response;
     // test the flipping of the overall parity_bit
-    parity_sequence ^= 1 << NUM_PARITY_BITS;
+    parity_sequence ^= 1 << INDIVIDUAL_PARITY_BITS;
     decode_256(message, parity_sequence, &decode_response);
     assert(decode_response.response_flags == OVERALL_PARITY_INVALID && decode_response.bit_position_to_correct == 0 && "Detects error when overall parity bit is flipped");
-    parity_sequence ^= 1 << NUM_PARITY_BITS;
+    parity_sequence ^= 1 << INDIVIDUAL_PARITY_BITS;
 
     // test the flipping of parity bits 
-    for (int i = 0; i < NUM_PARITY_BITS; ++i) {
-        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+    for (int i = 0; i < INDIVIDUAL_PARITY_BITS; ++i) {
+        parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
         decode_256(message, parity_sequence, &decode_response);
         assert(decode_response.response_flags == (OVERALL_PARITY_INVALID | BIT_CORRECTED) && decode_response.bit_position_to_correct == i + 1 && "Detects error when a parity bit that is not the overal parity bit is flipped");
-        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+        parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
     }
 
     // test the flipping of every bit in the message
@@ -74,12 +66,12 @@ void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
     // start with the parity bit first
     DecodeResponse_t decode_response;
 
-    parity_sequence ^= 1 << NUM_PARITY_BITS;
-    for (int i = 0; i < NUM_PARITY_BITS; ++i) {
-        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+    parity_sequence ^= 1 << INDIVIDUAL_PARITY_BITS;
+    for (int i = 0; i < INDIVIDUAL_PARITY_BITS; ++i) {
+        parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
         decode_256(message, parity_sequence, &decode_response);
         assert(!resolve_decode(message, &decode_response) && "Message should not be valid when overall parity bit and parity bit have been flipped");
-        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+        parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
     }
 
     // test the flipping of every bit in the message
@@ -92,17 +84,17 @@ void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
             message[i] ^= 1 << (32 - 1 - j);
         }
     }
-    parity_sequence ^= 1 << NUM_PARITY_BITS;
+    parity_sequence ^= 1 << INDIVIDUAL_PARITY_BITS;
 
     // test flipping one of the other parity bits
-    for (int i = 0; i < NUM_PARITY_BITS; ++i) {
-        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+    for (int i = 0; i < INDIVIDUAL_PARITY_BITS; ++i) {
+        parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
 
-        for (int j = i + 1; j < NUM_PARITY_BITS; ++j) {
-            parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - j);
+        for (int j = i + 1; j < INDIVIDUAL_PARITY_BITS; ++j) {
+            parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - j);
             decode_256(message, parity_sequence, &decode_response);
             assert(!resolve_decode(message, &decode_response) && "Message should no longer be valid when two parity bits have been flipped");
-            parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - j);
+            parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - j);
         }
 
         for (int k = 0; k < NUM_32_BIT_COLS_IN_BLOCK; ++k) {
@@ -115,7 +107,7 @@ void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
             }
         }
 
-        parity_sequence ^= 1 << (NUM_PARITY_BITS - 1 - i);
+        parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
     }
 
     assert(check_array(message));
@@ -156,7 +148,7 @@ void test_decode() {
     uint16_t parity_bits = encode_256(message);
     uint16_t overall_parity = encode_overall_parity(message, parity_bits);
 
-    uint16_t parity_sequence = overall_parity << NUM_PARITY_BITS | parity_bits;
+    uint16_t parity_sequence = overall_parity << INDIVIDUAL_PARITY_BITS | parity_bits;
 
     DecodeResponse_t decode_response;
     decode_256(message, parity_sequence, &decode_response);
@@ -169,7 +161,6 @@ void test_decode() {
 }
 
 int main(void) { 
-    test_bit_sequence_parity();
     test_encoding(); 
     test_overall_parity();
     test_decode();

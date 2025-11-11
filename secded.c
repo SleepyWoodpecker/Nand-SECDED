@@ -2,20 +2,20 @@
 
 #include <stdint.h>
 
-#include <stdio.h>
+// NOTE: Smallest return type is uint16_t, mostly for the sake of standardization
 
-uint16_t get_message_parity(const uint32_t raw_data[]) {
-  uint16_t current_parity_sum = 0;
-  for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
-    current_parity_sum ^= bit_sequence_parity(raw_data[i]);
-  }
-  return current_parity_sum;
-}
+static uint16_t bit_sequence_parity(uint32_t input);
+static uint16_t get_message_parity(const uint32_t raw_data[]);
 
+/**
+ * @brief: Given a 256 bit block of data, generate the parity bits
+ * @param raw_data: pointer to the 256 bit block of data, split into 32 bit chunks and represented as an array
+ * @return: the 9 parity bits for the message sequence
+ */
 uint16_t encode_256(const uint32_t raw_data[]) {
   // calculate parity bits for data
   uint16_t parity_bits = 0;
-  for (int i = 0; i < NUM_PARITY_BITS; ++i) {
+  for (int i = 0; i < INDIVIDUAL_PARITY_BITS; ++i) {
     int sequence_parity = 0;
     for (int j = 0; j < NUM_32_BIT_COLS_IN_BLOCK; ++j) {
       sequence_parity ^= bit_sequence_parity(raw_data[j] & parity_generator_idxs[i][j]);
@@ -25,9 +25,15 @@ uint16_t encode_256(const uint32_t raw_data[]) {
   }
 
   // expect 9 bits to come back from parity encoding
-  return parity_bits & 0x1ff;
+  return parity_bits & 0x1FF;
 }
 
+/**
+ * @brief: Calculate the overall parity bit
+ * @param raw_data: pointer to the 256 bit block of data, split into 32 bit chunks and represented as an array
+ * @param parity_bits: the 9 parity bits generated for this 256 bits of data
+ * @return: the overall parity bit
+*/
 uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_bits) {
   uint16_t current_parity_sum = get_message_parity(raw_data);
   uint16_t sequence_parity_bits = parity_bits & 0b111111111;
@@ -36,24 +42,19 @@ uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_
   return current_parity_sum;
 }
 
-// TODO: there should be some way to test this later on
-uint8_t bit_sequence_parity(uint32_t input) {
-  uint8_t sequence_parity = 0;
-  for (int i = 0; i < 32; ++i) {
-    sequence_parity ^=  input & 0b1;
-    input >>= 1;
-  }
-
-  return sequence_parity;
-}
-
+/**
+ * @brief: Decode the raw data, and update decode_response with the status of the data
+ * @param raw_data: pointer to the 256 bit block of data, split into 32 bit chunks and represented as an array
+ * @param parity_bits: the 9 parity bits generated from the 256 bits of data + the overall parity bit for the block of data
+ * @param decode_response: pointer to a struct that would inform the user of the decode status of the data
+ */
 void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeResponse_t *decode_response) {
   // remove the parity bit, since it is not used to determine the position of the flipped bit
-  uint16_t overall_parity_bit = parity_bits >> NUM_PARITY_BITS;
+  uint16_t overall_parity_bit = parity_bits >> INDIVIDUAL_PARITY_BITS;
   uint16_t decode_parity_bits = parity_bits & 0b111111111;
 
   uint16_t overall_bit_sum = 0;
-  for (int i = 0; i < NUM_PARITY_BITS; ++i) {
+  for (int i = 0; i < INDIVIDUAL_PARITY_BITS; ++i) {
     uint16_t local_bit_sum = bit_sequence_parity(decode_parity_bits & decode_matrix[i][0]);
     for (int j = 1; j < NUM_COLS_IN_DECODE_MATRIX; ++j) {
       local_bit_sum ^= bit_sequence_parity(raw_data[j - 1] & decode_matrix[i][j]);
@@ -73,6 +74,12 @@ void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeRes
   return;
 }
 
+/**
+ * @brief: resolve the data decoding, based on the decode_response
+ * @param raw_data: pointer to the 256 bit block of data, split into 32 bit chunks and represented as an array
+ * @param decode_response: the decode status for this 256 bit block of data
+ * @return: whether the returned data is valid
+ */
 bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response) {
   // the only way there would be no errors in the message is if:
   // overall parity has error and 1 bit was flipped
@@ -84,12 +91,12 @@ bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response) {
     uint16_t data_bit_to_correct = decode_response->bit_position_to_correct;
 
     // if it is a parity bit, just return normally
-    if (data_bit_to_correct < 10) {
+    if (data_bit_to_correct < TOTAL_NUM_PARITY_BITS) {
       return true;
     }
 
     // offset from parity bits
-    data_bit_to_correct -= 10;
+    data_bit_to_correct -= TOTAL_NUM_PARITY_BITS;
     // divide by 32
     uint16_t column_to_flip = data_bit_to_correct >> 5;
     // get data_bit_to_correct % 32
@@ -102,7 +109,35 @@ bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response) {
   return false;
 }
 
-const uint32_t parity_generator_idxs[NUM_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] = {
+/**
+ * @brief: Calculate the parity for the provided bit sequence
+ * @param input: the 32 bit sequence for which the parity will be determined
+ * @return: The parity for the provided bit sequence. 1 if overall sequence is odd, 0 if the oevrall sequence is even
+ */
+static uint16_t bit_sequence_parity(uint32_t input) {
+  uint16_t sequence_parity = 0;
+  for (int i = 0; i < 32; ++i) {
+    sequence_parity ^=  input & 0b1;
+    input >>= 1;
+  }
+
+  return sequence_parity;
+}
+
+/**
+ * @brief: Calculate the parity for the message
+ * @param raw_data: pointer to the 256 bit block of data, split into 32 bit chunks and represented as an array
+ * @return: the overall parity of the 256 bit block message
+ */
+static uint16_t get_message_parity(const uint32_t raw_data[]) {
+  uint16_t current_parity_sum = 0;
+  for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
+    current_parity_sum ^= bit_sequence_parity(raw_data[i]);
+  }
+  return current_parity_sum;
+}
+
+const uint32_t parity_generator_idxs[INDIVIDUAL_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] = {
   {0, 0, 0, 0, 0, 0, 0, 511},
   {0, 0, 0, 255, 4294967295, 4294967295, 4294967295, 4294966784},
   {0, 127, 4294967295, 4294967040, 0, 511, 4294967295, 4294966784},
@@ -114,7 +149,6 @@ const uint32_t parity_generator_idxs[NUM_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] 
   {3669316970, 2863311573, 1431655765, 1431655850, 2863311530, 2863311530, 2863311530, 2863311701},
 };
 
-// last number should not be 32 bits :/
 const uint32_t decode_matrix[][NUM_COLS_IN_DECODE_MATRIX] = {
   {256, 0, 0, 0, 0, 0, 0, 0, 511}, 
   {128, 0, 0, 0, 255, 4294967295, 4294967295, 4294967295, 4294966784}, 
