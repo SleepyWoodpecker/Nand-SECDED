@@ -113,15 +113,17 @@ bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response) {
  * @brief: Calculate the parity for the provided bit sequence
  * @param input: the 32 bit sequence for which the parity will be determined
  * @return: The parity for the provided bit sequence. 1 if overall sequence is odd, 0 if the oevrall sequence is even
+ *
+ * NOTE: this approach makes use of "bit folding", where the upper half is folded into the lower half. This approach avoids the use of a loop.
  */
 static uint16_t bit_sequence_parity(uint32_t input) {
-  uint16_t sequence_parity = 0;
-  for (int i = 0; i < 32; ++i) {
-    sequence_parity ^=  input & 0b1;
-    input >>= 1;
-  }
+  input ^= input >> 16;
+  input ^= input >> 8;
+  input ^= input >> 4;
+  input ^= input >> 2;
+  input ^= input >> 1;
 
-  return sequence_parity;
+  return input & 1;
 }
 
 /**
