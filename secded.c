@@ -1,11 +1,14 @@
 #include "secded.h"
 
 #include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
 
 // NOTE: Smallest return type is uint16_t, mostly for the sake of standardization
 
 static uint16_t bit_sequence_parity(uint32_t input);
 static uint16_t get_message_parity(const uint32_t raw_data[]);
+static ParityBlock_t split_parity_bits(const uint16_t parity_bits, const int set_number);
 
 /**
  * @brief: Given a 256 bit block of data, generate the parity bits
@@ -138,6 +141,64 @@ static uint16_t get_message_parity(const uint32_t raw_data[]) {
   }
   return current_parity_sum;
 }
+
+/**
+ * @brief: Given a pointer to a page raw data, calculate generate the parity sequence
+ * @param raw_data: pointer to an array of bytes to encode (this is assumed to be a block of 4096 bytes)
+ * @param parity_bit_sequences: pointer to an array of bytes where encodings will be put (this should be zeroed out)
+ */
+void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]) {
+  // first, recast the pointers to the appropriate types
+  uint32_t *r_raw_data = (uint32_t *)raw_data;
+  size_t parity_bit_sequences_idx = 0;
+
+  uint8_t bit_offset = 0;
+  for (int i = 0; i < NUM_BLOCKS_IN_PAGE; ++i) {
+    uint16_t parity_seq = encode_256(r_raw_data);
+    uint16_t overall_parity_seq = encode_overall_parity(r_raw_data, parity_seq);
+
+    uint16_t overall_parity = (overall_parity_seq << INDIVIDUAL_PARITY_BITS) | parity_seq; 
+    
+    ParityBlock_t parity_blocks = split_parity_bits(overall_parity, i);
+    // write the parity bits to the block
+    parity_bit_sequences[parity_bit_sequences_idx] |= parity_blocks.first_section;
+    parity_bit_sequences[parity_bit_sequences_idx + 1] |= parity_blocks.second_section;
+
+    parity_bit_sequences_idx++;
+    // the sequence repeats itself every 4 blocks -> perform a full wraparound
+    // n & 0b11 takes mod 4
+    if (i != 0 && ((i + 1) & 0b11) == 0) {
+      parity_bit_sequences_idx++;
+    }
+
+    // move the pointer to the next 256 bit block
+    raw_data += NUM_32_BIT_COLS_IN_BLOCK;
+  }
+}
+
+/**
+ * @brief: Split the parity block that it can be put properly into a uint8_t array
+ * @param parity_bits: the encoded parity bits
+ * @param set_number: the block number for which the parity bits were generated for
+ * @return: the split up bit sequence to fit into the spare region
+ *
+ * Splits look like:
+ * 8, 2
+ * 6, 4
+ * 4, 6
+ * 2, 8
+ */
+static ParityBlock_t split_parity_bits(const uint16_t parity_bits, const int set_number) {
+  ParityBlock_t block;
+  // n & 0b11 takes mod 4
+  int num_bits_in_second_block = (set_number & 0b11) * 2 + 2;
+
+  block.first_section = parity_bits >> num_bits_in_second_block;
+  block.second_section = (parity_bits ^ (block.first_section << num_bits_in_second_block)) << (8 - num_bits_in_second_block);
+
+  return block;
+}
+
 
 const uint32_t parity_generator_idxs[INDIVIDUAL_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK] = {
   {0, 0, 0, 0, 0, 0, 0, 511},

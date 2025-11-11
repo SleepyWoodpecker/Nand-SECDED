@@ -8,6 +8,7 @@
 #define TOTAL_NUM_PARITY_BITS       (INDIVIDUAL_PARITY_BITS + 1)
 #define NUM_32_BIT_COLS_IN_BLOCK    8
 #define NUM_COLS_IN_DECODE_MATRIX   (NUM_32_BIT_COLS_IN_BLOCK + 1)
+#define NUM_BLOCKS_IN_PAGE          (4096 / 32)
 
 // matrix used to encode the generated message
 extern const uint32_t parity_generator_idxs[INDIVIDUAL_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK];
@@ -29,4 +30,10 @@ uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_
 void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeResponse_t *decode_response);
 bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response);
 
+typedef struct {
+  uint8_t first_section;
+  uint8_t second_section; 
+} ParityBlock_t;
+
+void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]);
 #endif
