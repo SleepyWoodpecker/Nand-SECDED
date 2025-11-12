@@ -9,6 +9,7 @@
 #define NUM_32_BIT_COLS_IN_BLOCK    8
 #define NUM_COLS_IN_DECODE_MATRIX   (NUM_32_BIT_COLS_IN_BLOCK + 1)
 #define NUM_BLOCKS_IN_PAGE          (4096 / 32)
+#define SYNDROME_OFFSET             511
 
 // matrix used to encode the generated message
 extern const uint32_t parity_generator_idxs[INDIVIDUAL_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK];
@@ -20,6 +21,7 @@ extern const uint16_t error_location[];
 // set flags to define the overall result from decoding the message together with parity bits
 #define BIT_CORRECTED               (1 << 0)
 #define OVERALL_PARITY_INVALID      (1 << 1)
+#define DOUBLE_BIT_ERROR            (1 << 2)
 typedef struct {
   uint8_t response_flags;
   uint16_t bit_position_to_correct;
@@ -67,5 +69,13 @@ typedef struct {
  * @param parity_bit_sequences: pointer to an array of bytes where encodings will be put (this should be zeroed out)
  */
 void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]);
+
+/**
+ * @brief: Determine if the page of data is valid, correcting any single bit errors in the process
+ * @param raw_data: pointer to an array of raw data bytes
+ * @param parity_bit_sequences: pointer to the array of bytes holding parity bits
+ * @return: if the byte sequence held in raw_data is valid or not
+ */
+bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]);
 
 #endif
