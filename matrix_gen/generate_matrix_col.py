@@ -59,7 +59,10 @@ def generate_decode_matrix(parity_matrices, num_parity_bits):
         i = num_parity_bits - 1 - n
         decode_matrix.append(bin(1 << n)[2:].zfill(num_parity_bits))
 
-    chunked_decode_matrix = []
+    chunked_decode_matrix = [[0b1111111111]]
+    for i in range(8):
+        chunked_decode_matrix[0].append(0b11111111111111111111111111111111)
+
     for i, parity_selection in enumerate(parity_matrices):
         decode_matrix_chunks = []
         decode_matrix_chunks.append(int(decode_matrix[i], 2))
@@ -115,23 +118,23 @@ def encode_message(message, encoding_matrix):
 def get_decode_position(error_correction_idx):
     arr = [
         0,
-        9,
-        8,
+        1,
         10,
-        7,
+        9,
         11,
+        8,
         12,
         13,
-        6,
         14,
+        7,
         15,
         16,
         17,
         18,
         19,
         20,
-        5,
         21,
+        6,
         22,
         23,
         24,
@@ -146,8 +149,8 @@ def get_decode_position(error_correction_idx):
         33,
         34,
         35,
-        4,
         36,
+        5,
         37,
         38,
         39,
@@ -178,8 +181,8 @@ def get_decode_position(error_correction_idx):
         64,
         65,
         66,
-        3,
         67,
+        4,
         68,
         69,
         70,
@@ -242,8 +245,8 @@ def get_decode_position(error_correction_idx):
         127,
         128,
         129,
-        2,
         130,
+        3,
         131,
         132,
         133,
@@ -370,8 +373,8 @@ def get_decode_position(error_correction_idx):
         254,
         255,
         256,
-        1,
         257,
+        2,
         258,
         259,
         260,
@@ -380,32 +383,31 @@ def get_decode_position(error_correction_idx):
         263,
         264,
         265,
+        266,
     ]
     return arr[error_correction_idx]
 
 
 def decode_message(encoded_message, decoding_matrix, num_parity_bits):
-    encoded_message = encoded_message[1:]
     error_val = ""
 
-    raw_message = encoded_message[9:]
+    raw_message = encoded_message[10:]
     for val_list in decoding_matrix:
-        local_sum = bit_sum(int(encoded_message[:9], 2) & val_list[0])
+        local_sum = bit_sum(int(encoded_message[:10], 2) & val_list[0])
         for i, val in enumerate(val_list[1:]):
             local_sum ^= bit_sum(val & int(raw_message[i * 32 : (i + 1) * 32], 2))
 
         error_val += str(local_sum)
 
-    assert num_parity_bits == len(error_val)
-
-    error_location_idx = get_decode_position(int(error_val, 2))
+    assert num_parity_bits + 1 == len(error_val)
+    error_location_idx = get_decode_position(int(error_val, 2) - 511)
     corrected_message = False
-    if error_location_idx:
+    if error_location_idx >= 0:
         # print("Error at bit", error_location_idx - 1)
         encoded_message = flip_bit(encoded_message, error_location_idx - 1)
         corrected_message = True
 
-    message = encoded_message[num_parity_bits:]
+    message = encoded_message[num_parity_bits + 1 :]
 
     return message, corrected_message
 
@@ -493,8 +495,6 @@ def main():
         parity_matrices=parity_matrices, num_parity_bits=num_parity_bits
     )
 
-    print(decoding_matrix)
-
     # test single bit flips
     for i in range(266):
         overall_parity_valid, original_message, corrected = test_hamming(
@@ -505,12 +505,11 @@ def main():
             bit_to_flip=i,
         )
 
-        assert original_message == message
-        assert not overall_parity_valid
-        if i != 0:
-            assert corrected
-        else:
-            assert not corrected
+        assert original_message == message, f"Bit {i}"
+        no_error = (corrected and not overall_parity_valid) or (
+            not corrected and overall_parity_valid
+        )
+        assert no_error, f"Bit {i}"
 
     # test all possible double bit flips
     for i in range(266):
@@ -527,10 +526,12 @@ def main():
             # the only way to have no error is:
             # you have no errors, and the overall message is valid
             # you have an error, and you corrected one bit in the message
-            no_error = (not corrected and overall_parity_valid) or (
-                corrected and not overall_parity_valid
+            no_error = (corrected and not overall_parity_valid) or (
+                not corrected and overall_parity_valid
             )
-            assert not no_error, f"Bit 1: {i}, Bit 2: {j} "
+            assert (
+                not no_error
+            ), f"Bit 1: {i}, Bit 2: {j}, Corrected: {corrected}, Overall valid: {overall_parity_valid} "
 
 
 if __name__ == "__main__":
