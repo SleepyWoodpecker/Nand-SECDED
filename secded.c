@@ -127,8 +127,7 @@ void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[
       parity_bit_sequences_idx++;
     }
 
-    // move the pointer to the next 256 bit block
-    raw_data += NUM_32_BIT_COLS_IN_BLOCK;
+    r_raw_data += NUM_32_BIT_COLS_IN_BLOCK;
   }
 }
 
@@ -138,9 +137,8 @@ bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restri
   for (int i = 0; i < NUM_BLOCKS_IN_PAGE; ++i) {
     DecodeResponse_t decode_response;
     uint16_t parity_bits = extract_block_parity_sequence(parity_bit_sequences, parity_bit_sequence_idx, i);
-
-    decode_256(r_raw_data, parity_bit_sequence_idx, &decode_response);
-
+    decode_256(r_raw_data, parity_bits, &decode_response);
+    
     if (!resolve_decode(r_raw_data, &decode_response)) {
       return false;
     }
@@ -149,6 +147,8 @@ bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restri
     if (i != 0 && ((i + 1) & 0b11) == 0) {
       parity_bit_sequence_idx++;
     }
+
+    r_raw_data += NUM_32_BIT_COLS_IN_BLOCK;
   }
 
   return true;

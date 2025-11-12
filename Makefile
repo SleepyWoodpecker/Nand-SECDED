@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -I.
+CFLAGS = -Wall -Wextra -I. -g3
 
 INCLUDE = secded.h
 SOURCE = secded.c
