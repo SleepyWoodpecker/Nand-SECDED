@@ -470,6 +470,50 @@ void test_page_decode() {
         }
     }
     
+    // test flipping 2 bits
+    // flip first bit from parity
+    for (int z = 0; z < NUM_BLOCKS_IN_PAGE; ++z) {
+        // second from parity as well
+        for (int i = 0; i < 10; ++i) {
+            int blk_idx = z * 10 + i;
+
+            int o_block_number = blk_idx / 8;
+            int o_bit_number = blk_idx % 8;
+            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+
+            for (int j = i + 1; j < 10; ++j) {
+                int j_blk_idx = blk_idx + 1;
+                int j_block_number = j_blk_idx / 8;
+                int j_bit_number = j_blk_idx % 8;
+
+                spare_region[j_block_number] ^= 1 << (8 - 1 - j_bit_number);
+                assert(!decode_page((uint8_t *)message, spare_region) && "Page cannot be decoded if a data bit is flipped and a single parity bit is flipped");
+                spare_region[j_block_number] ^= 1 << (8 - 1 - j_bit_number);
+            }
+
+            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+        }
+
+        // flip parity bit and data bit
+        for (int i = 0; i < 10; ++i) {
+            int blk_idx = z * 10 + i;
+
+            int o_block_number = blk_idx / 8;
+            int o_bit_number = blk_idx % 8;
+            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+
+            // test flipping any bit from the data section
+            for (int k = 0; k < NUM_32_BIT_COLS_IN_BLOCK; ++k) {
+                for (int j = 0; j < 32; ++j) {
+                    message[z * NUM_32_BIT_COLS_IN_BLOCK + k] ^= 1 << (32 - 1 - j);
+                    assert(!decode_page((uint8_t *)message, spare_region) && "Page cannot be decoded if a single data bit is flipped");
+                    message[z * NUM_32_BIT_COLS_IN_BLOCK + k] ^= 1 << (32 - 1 - j);
+                }
+            }
+
+            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+        }
+    }
 }
 
 int main(void) { 

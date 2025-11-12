@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <stdio.h>
 
 // NOTE: Smallest return type is uint16_t, mostly for the sake of standardization
 
@@ -138,7 +137,7 @@ bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restri
     DecodeResponse_t decode_response;
     uint16_t parity_bits = extract_block_parity_sequence(parity_bit_sequences, parity_bit_sequence_idx, i);
     decode_256(r_raw_data, parity_bits, &decode_response);
-    
+
     if (!resolve_decode(r_raw_data, &decode_response)) {
       return false;
     }
@@ -226,8 +225,6 @@ static uint16_t extract_block_parity_sequence(const uint8_t parity_sequence[], c
 
   uint16_t top_half = ((uint16_t)parity_sequence[parity_sequence_idx] << num_bits_in_second_block) >> num_bits_in_second_block;
   uint16_t bottom_half = (parity_sequence[parity_sequence_idx + 1] >> (8 - num_bits_in_second_block));
-
-  printf("top_half: %d, bottom_half: %d, result: %d\n", top_half, bottom_half, (top_half << num_bits_in_second_block | bottom_half) & 0x3FF);
 
   // return the bottom 10 bits
   return (top_half << num_bits_in_second_block | bottom_half) & 0x3FF;
