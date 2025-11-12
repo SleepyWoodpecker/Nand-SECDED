@@ -1,3 +1,5 @@
 .DS_Store
 *.o
 test_secded
+speed_test_with_restrict
+speed_test_without_restrict

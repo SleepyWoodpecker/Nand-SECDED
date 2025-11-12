@@ -130,6 +130,33 @@ void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[
   }
 }
 
+void encode_page_without_restrict(const uint8_t raw_data[], uint8_t parity_bit_sequences[]) {
+  // first, recast the pointers to the appropriate types
+  uint32_t *r_raw_data = (uint32_t *)raw_data;
+  size_t parity_bit_sequences_idx = 0;
+
+  for (int i = 0; i < NUM_BLOCKS_IN_PAGE; ++i) {
+    uint16_t parity_seq = encode_256(r_raw_data);
+    uint16_t overall_parity_seq = encode_overall_parity(r_raw_data, parity_seq);
+
+    uint16_t overall_parity = (overall_parity_seq << INDIVIDUAL_PARITY_BITS) | parity_seq; 
+    
+    ParityBlock_t parity_blocks = split_parity_bits(overall_parity, i);
+    // write the parity bits to the block
+    parity_bit_sequences[parity_bit_sequences_idx] |= parity_blocks.first_section;
+    parity_bit_sequences[parity_bit_sequences_idx + 1] |= parity_blocks.second_section;
+
+    parity_bit_sequences_idx++;
+    // the sequence repeats itself every 4 blocks -> perform a full wraparound
+    // n & 0b11 takes mod 4
+    if (i != 0 && ((i + 1) & 0b11) == 0) {
+      parity_bit_sequences_idx++;
+    }
+
+    r_raw_data += NUM_32_BIT_COLS_IN_BLOCK;
+  }
+}
+
 bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]) {
   uint32_t *r_raw_data = (uint32_t *)raw_data;
   int parity_bit_sequence_idx = 0;

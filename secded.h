@@ -69,6 +69,7 @@ typedef struct {
  * @param parity_bit_sequences: pointer to an array of bytes where encodings will be put (this should be zeroed out)
  */
 void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]);
+void encode_page_without_restrict(const uint8_t raw_data[], uint8_t parity_bit_sequences[]);
 
 /**
  * @brief: Determine if the page of data is valid, correcting any single bit errors in the process
