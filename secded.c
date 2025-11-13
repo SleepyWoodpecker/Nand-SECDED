@@ -180,6 +180,29 @@ bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restri
   return true;
 }
 
+bool decode_page_without_restrict(uint8_t raw_data[], uint8_t parity_bit_sequences[]) {
+  uint32_t *r_raw_data = (uint32_t *)raw_data;
+  int parity_bit_sequence_idx = 0;
+  for (int i = 0; i < NUM_BLOCKS_IN_PAGE; ++i) {
+    DecodeResponse_t decode_response;
+    uint16_t parity_bits = extract_block_parity_sequence(parity_bit_sequences, parity_bit_sequence_idx, i);
+    decode_256(r_raw_data, parity_bits, &decode_response);
+
+    if (!resolve_decode(r_raw_data, &decode_response)) {
+      return false;
+    }
+
+    parity_bit_sequence_idx++;
+    if (i != 0 && ((i + 1) & 0b11) == 0) {
+      parity_bit_sequence_idx++;
+    }
+
+    r_raw_data += NUM_32_BIT_COLS_IN_BLOCK;
+  }
+
+  return true;
+}
+
 /**
  * @brief: Calculate the parity for the provided bit sequence
  * @param input: the 32 bit sequence for which the parity will be determined

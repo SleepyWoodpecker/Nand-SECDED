@@ -78,5 +78,6 @@ void encode_page_without_restrict(const uint8_t raw_data[], uint8_t parity_bit_s
  * @return: if the byte sequence held in raw_data is valid or not
  */
 bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]);
+bool decode_page_without_restrict(uint8_t raw_data[], uint8_t parity_bit_sequences[]);
 
 #endif

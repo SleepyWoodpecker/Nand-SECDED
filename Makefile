@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -I. -O2
+CFLAGS = -Wall -Wextra -I. -O0 -fno-strict-aliasing
 
 INCLUDE = secded.h
 SOURCE = secded.c
@@ -36,4 +36,4 @@ speed_test_without_restrict.o : speed_test_without_restrict.c
 	$(CC) $(CFLAGS) $< -c -o $@
 
 clean:
-	rm -f *.o test_secded
+	rm -f *.o test_secded speed_test_with_restrict speed_test_without_restrict

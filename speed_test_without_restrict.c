@@ -1,5 +1,7 @@
 #include "secded.h"
 
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 int main() {
@@ -135,7 +137,16 @@ int main() {
     };
 
     uint8_t spare_block[162];
+    memset(spare_block, 0, 162);
+    // mark the first and last byte to make sure there is no out of bounds access
+    uint8_t *spare_region = spare_block + 1;
 
-    for (int i = 0; i < 10000000; ++i)
-      encode_page_without_restrict((uint8_t *)message, spare_block + 1);
+    encode_page((uint8_t*)message, spare_region);
+    for (int i = 0; i < 100000; ++i) {
+      if(!decode_page_without_restrict((uint8_t*)message, spare_region)) {
+        return -1;
+      }
+    }
+
+    return 0;
 }
