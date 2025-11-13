@@ -442,6 +442,9 @@ void test_page_decode() {
     assert(check_spare(spare_block) && "Spare region was incorrectly created");
 
     uint8_t *spare_region = spare_block + 1;
+
+    // check that there are no errors when there are no bits flipped
+    assert(decode_page((uint8_t *)message, spare_region) && "Encountered bit error when decoding unmodified page");
     
     // test on a block by block level
     // test single bit flips
