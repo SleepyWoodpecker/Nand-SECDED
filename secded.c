@@ -103,7 +103,7 @@ bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response) {
   return false;
 }
 
-void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]) {
+void encode_page(const uint8_t raw_data[], uint8_t parity_bit_sequences[]) {
   // first, recast the pointers to the appropriate types
   uint32_t *r_raw_data = (uint32_t *)raw_data;
   size_t parity_bit_sequences_idx = 0;
@@ -130,7 +130,7 @@ void encode_page(const uint8_t raw_data[restrict], uint8_t parity_bit_sequences[
   }
 }
 
-bool decode_page(uint8_t raw_data[restrict], uint8_t parity_bit_sequences[restrict]) {
+bool decode_page(uint8_t raw_data[], uint8_t parity_bit_sequences[]) {
   uint32_t *r_raw_data = (uint32_t *)raw_data;
   int parity_bit_sequence_idx = 0;
   for (int i = 0; i < NUM_BLOCKS_IN_PAGE; ++i) {
