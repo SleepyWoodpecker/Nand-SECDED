@@ -1,15 +1,20 @@
-#ifndef SECDED_H_
-#define SECDED_H_
+#ifndef EAL_SECDED_H_
+#define EAL_SECDED_H_
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 
-#define INDIVIDUAL_PARITY_BITS      9 // these are the parity bits that encode a subset of the sequence
-#define TOTAL_NUM_PARITY_BITS       (INDIVIDUAL_PARITY_BITS + 1)
-#define NUM_32_BIT_COLS_IN_BLOCK    8
-#define NUM_COLS_IN_DECODE_MATRIX   (NUM_32_BIT_COLS_IN_BLOCK + 1)
-#define NUM_BLOCKS_IN_PAGE          (4096 / 32)
-#define SYNDROME_OFFSET             511
+#define INDIVIDUAL_PARITY_BITS          9 // these are the parity bits that encode a subset of the sequence
+#define TOTAL_NUM_PARITY_BITS           (INDIVIDUAL_PARITY_BITS + 1)
+#define NUM_32_BIT_COLS_IN_BLOCK        8
+#define NUM_COLS_IN_DECODE_MATRIX       (NUM_32_BIT_COLS_IN_BLOCK + 1)
+#define NUM_BLOCKS_IN_PAGE              (4096 / 32)
+#define SYNDROME_OFFSET                 511
+
+#define RAW_PAGE_SIZE                   4352
+#define SECDED_REGION_SIZE              160
+#define SECDED_REGION_START_OFFSET_IDX  (RAW_PAGE_SIZE - SECDED_REGION_SIZE - 1) // subtract 1 to ensure index starts from 0
 
 // matrix used to encode the generated message
 extern const uint32_t parity_generator_idxs[INDIVIDUAL_PARITY_BITS][NUM_32_BIT_COLS_IN_BLOCK];
@@ -32,7 +37,7 @@ typedef struct {
  * @param raw_data: pointer to the 256 bit block of data, split into 32 bit chunks and represented as an array
  * @return: the 9 parity bits for the message sequence
  */
-uint16_t encode_256(const uint32_t raw_data[]);
+uint16_t eal_encode_256(const uint32_t raw_data[]);
 
 /**
  * @brief: Calculate the overall parity bit
@@ -40,7 +45,7 @@ uint16_t encode_256(const uint32_t raw_data[]);
  * @param parity_bits: the 9 parity bits generated for this 256 bits of data
  * @return: the overall parity bit
 */
-uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_bits);
+uint16_t eal_encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_bits);
 
 /**
  * @brief: Decode the raw data, and update decode_response with the status of the data
@@ -48,7 +53,7 @@ uint16_t encode_overall_parity(const uint32_t raw_data[], const uint16_t parity_
  * @param parity_bits: the 9 parity bits generated from the 256 bits of data + the overall parity bit for the block of data
  * @param decode_response: pointer to a struct that would inform the user of the decode status of the data
  */
-void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeResponse_t *decode_response);
+void eal_check_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeResponse_t *decode_response);
 
 /**
  * @brief: resolve the data decoding, based on the decode_response
@@ -56,7 +61,7 @@ void decode_256(const uint32_t raw_data[], const uint16_t parity_bits, DecodeRes
  * @param decode_response: the decode status for this 256 bit block of data
  * @return: whether the returned data is valid
  */
-bool resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response);
+bool eal_resolve_decode(uint32_t raw_data[], DecodeResponse_t *decode_response);
 
 typedef struct {
   uint8_t first_section;
@@ -65,10 +70,9 @@ typedef struct {
 
 /**
  * @brief: Given a pointer to a page raw data, calculate generate the parity sequence
- * @param raw_data: pointer to an array of bytes to encode (this is assumed to be a block of 4096 bytes)
- * @param parity_bit_sequences: pointer to an array of bytes where encodings will be put (this should be zeroed out)
+ * @param flash_block: pointer to the start of the 4352 byte array, meant to be written to flash
  */
-void encode_page(const uint8_t raw_data[], uint8_t parity_bit_sequences[]);
+void eal_encode_page(uint8_t flash_block[]);
 
 /**
  * @brief: Determine if the page of data is valid, correcting any single bit errors in the process
@@ -76,6 +80,6 @@ void encode_page(const uint8_t raw_data[], uint8_t parity_bit_sequences[]);
  * @param parity_bit_sequences: pointer to the array of bytes holding parity bits
  * @return: if the byte sequence held in raw_data is valid or not
  */
-bool decode_page(uint8_t raw_data[], uint8_t parity_bit_sequences[]);
+bool eal_check_page(uint8_t raw_data[], uint8_t parity_bit_sequences[]);
 
 #endif

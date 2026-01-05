@@ -8,26 +8,26 @@
 #define SPARE_MAGIC 0x33
 
 bool check_array(uint32_t decoded_message[]);
-bool check_spare(uint8_t spare_region[162]);
+bool check_spare(uint8_t spare_region[161]);
 
 void test_encoding() {
     uint32_t message[] = {2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
 
-    uint16_t parity_bits = encode_256(message);
+    uint16_t parity_bits = eal_encode_256(message);
 
     assert(parity_bits == 0b100111011 && "Parity bits do not match");
 }
 
 void test_overall_parity() {
     uint32_t odd_message[] = {2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
-    uint16_t parity_bits = encode_256(odd_message);
-    uint16_t overall_parity = encode_overall_parity(odd_message, parity_bits);
+    uint16_t parity_bits = eal_encode_256(odd_message);
+    uint16_t overall_parity = eal_encode_overall_parity(odd_message, parity_bits);
     assert(overall_parity == 0b1 && "Overall parity bit does not match");
 
     // created by flipping one bit 
     uint32_t even_message[] = {2909143769, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
-    parity_bits = encode_256(odd_message);
-    overall_parity = encode_overall_parity(even_message, parity_bits);
+    parity_bits = eal_encode_256(odd_message);
+    overall_parity = eal_encode_overall_parity(even_message, parity_bits);
     assert(overall_parity == 0b0 && "Overall parity bit does not match");
 }
 
@@ -39,7 +39,7 @@ void test_single_bit_flip(uint32_t message[], uint16_t parity_sequence) {
     // test the flipping of parity bits 
     for (int i = 0; i < INDIVIDUAL_PARITY_BITS; ++i) {
         parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - i);
-        decode_256(message, parity_sequence, &decode_response);
+        eal_check_256(message, parity_sequence, &decode_response);
         assert(decode_response.response_flags == (OVERALL_PARITY_INVALID | BIT_CORRECTED) && decode_response.bit_position_to_correct == i + 1 && "Detects error when a parity bit that is not the overal parity bit is flipped");
         parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - i);
     }
@@ -48,9 +48,9 @@ void test_single_bit_flip(uint32_t message[], uint16_t parity_sequence) {
     for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
         for (int j = 0; j < 32; ++j) {
             message[i] ^= 1 << (32 - 1 - j);
-            decode_256(message, parity_sequence, &decode_response);
+            eal_check_256(message, parity_sequence, &decode_response);
             assert(decode_response.response_flags == (OVERALL_PARITY_INVALID | BIT_CORRECTED) && decode_response.bit_position_to_correct == i * 32 + j + 11 && "Detects error when a message bit is flipped");
-            assert(resolve_decode(message, &decode_response) && "Message is no longer valid after attempt to recover from flipping data bit");
+            assert(eal_resolve_decode(message, &decode_response) && "Message is no longer valid after attempt to recover from flipping data bit");
             assert(check_array(message) && "Original message cannot be recovered");
         }
     }
@@ -67,8 +67,8 @@ void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
     parity_sequence ^= 1 << INDIVIDUAL_PARITY_BITS;
     for (int i = 0; i < INDIVIDUAL_PARITY_BITS; ++i) {
         parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
-        decode_256(message, parity_sequence, &decode_response);
-        assert(!resolve_decode(message, &decode_response) && "Message should not be valid when overall parity bit and parity bit have been flipped");
+        eal_check_256(message, parity_sequence, &decode_response);
+        assert(!eal_resolve_decode(message, &decode_response) && "Message should not be valid when overall parity bit and parity bit have been flipped");
         parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - i);
     }
 
@@ -76,8 +76,8 @@ void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
     for (int i = 0; i < NUM_32_BIT_COLS_IN_BLOCK; ++i) {
         for (int j = 0; j < 32; ++j) {
             message[i] ^= 1 << (32 - 1 - j);
-            decode_256(message, parity_sequence, &decode_response);
-            assert(!resolve_decode(message, &decode_response) && "Message should not be valid after parity bit and data bit have been flipped");
+            eal_check_256(message, parity_sequence, &decode_response);
+            assert(!eal_resolve_decode(message, &decode_response) && "Message should not be valid after parity bit and data bit have been flipped");
             assert(!check_array(message) && "Array should no longer be valid");
             message[i] ^= 1 << (32 - 1 - j);
         }
@@ -90,16 +90,16 @@ void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
 
         for (int j = i + 1; j < INDIVIDUAL_PARITY_BITS; ++j) {
             parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - j);
-            decode_256(message, parity_sequence, &decode_response);
-            assert(!resolve_decode(message, &decode_response) && "Message should no longer be valid when two parity bits have been flipped");
+            eal_check_256(message, parity_sequence, &decode_response);
+            assert(!eal_resolve_decode(message, &decode_response) && "Message should no longer be valid when two parity bits have been flipped");
             parity_sequence ^= 1 << (INDIVIDUAL_PARITY_BITS - 1 - j);
         }
 
         for (int k = 0; k < NUM_32_BIT_COLS_IN_BLOCK; ++k) {
             for (int j = 0; j < 32; ++j) {
                 message[k] ^= 1 << (32 - 1 - j);
-                decode_256(message, parity_sequence, &decode_response);
-                assert(!resolve_decode(message, &decode_response) && "Message should no longer be valid when a parity bit and a data bit have been flipped");
+                eal_check_256(message, parity_sequence, &decode_response);
+                assert(!eal_resolve_decode(message, &decode_response) && "Message should no longer be valid when a parity bit and a data bit have been flipped");
                 assert(!check_array(message) && "Array should no longer be valid");
                 message[k] ^= 1 << (32 - 1 - j);
             }
@@ -123,8 +123,8 @@ void test_double_bit_flip(uint32_t message[], uint16_t parity_sequence) {
                     }
 
                     message[k] ^= 1 << (32 - 1 - j);
-                    decode_256(message, parity_sequence, &decode_response);
-                    assert(!resolve_decode(message, &decode_response) && "Message should no longer be valid when a parity bit and a data bit have been flipped");
+                    eal_check_256(message, parity_sequence, &decode_response);
+                    assert(!eal_resolve_decode(message, &decode_response) && "Message should no longer be valid when a parity bit and a data bit have been flipped");
                     assert(!check_array(message) && "Array should no longer be valid");
                     message[k] ^= 1 << (32 - 1 - j);
                 }
@@ -143,13 +143,13 @@ Test the decode function by checking that:
 */
 void test_decode() {
     uint32_t message[] = {2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083};
-    uint16_t parity_bits = encode_256(message);
-    uint16_t overall_parity = encode_overall_parity(message, parity_bits);
+    uint16_t parity_bits = eal_encode_256(message);
+    uint16_t overall_parity = eal_encode_overall_parity(message, parity_bits);
 
     uint16_t parity_sequence = overall_parity << INDIVIDUAL_PARITY_BITS | parity_bits;
 
     DecodeResponse_t decode_response;
-    decode_256(message, parity_sequence, &decode_response);
+    eal_check_256(message, parity_sequence, &decode_response);
     assert(decode_response.response_flags == 0 && decode_response.bit_position_to_correct == 0 && "No error detected when there is no bit flip");
 
     test_single_bit_flip(message, parity_sequence);
@@ -158,7 +158,7 @@ void test_decode() {
 
 void test_page_encode() {
     // simulate 4096 byte block
-    uint32_t message[] = {
+    uint32_t message[RAW_PAGE_SIZE] = {
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
@@ -289,19 +289,17 @@ void test_page_encode() {
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
     };
 
-    uint8_t spare_block[162];
-    memset(spare_block, 0, 162);
-    // mark the first and last byte to make sure there is no out of bounds access
-    spare_block[0] = SPARE_MAGIC;
+    uint8_t *spare_block = (uint8_t *)message + SECDED_REGION_START_OFFSET_IDX;
+    memset(spare_block, 0, 161);
     spare_block[161] = SPARE_MAGIC;
 
-    encode_page((uint8_t *)message, spare_block + 1);
+    eal_encode_page((uint8_t *)message);
     assert(check_spare(spare_block) && "Spare region was incorrectly created");
 }
 
 void test_page_decode() {
     // simulate 4096 byte block
-    uint32_t message[] = {
+    uint32_t message[RAW_PAGE_SIZE] = {
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
@@ -432,19 +430,17 @@ void test_page_decode() {
         2909143768, 1204695435, 1134521375, 3492009847, 3660384855, 2363530907, 1281558073, 3101431083,
     };
 
-    uint8_t spare_block[162];
-    memset(spare_block, 0, 162);
+    uint8_t *spare_block = (uint8_t *)message + SECDED_REGION_START_OFFSET_IDX;
+    memset(spare_block, 0, 161);
     // mark the first and last byte to make sure there is no out of bounds access
-    spare_block[0] = SPARE_MAGIC;
     spare_block[161] = SPARE_MAGIC;
 
-    encode_page((uint8_t *)message, spare_block + 1);
+    eal_encode_page((uint8_t *)message);
     assert(check_spare(spare_block) && "Spare region was incorrectly created");
 
-    uint8_t *spare_region = spare_block + 1;
 
     // check that there are no errors when there are no bits flipped
-    assert(decode_page((uint8_t *)message, spare_region) && "Encountered bit error when decoding unmodified page");
+    assert(eal_check_page((uint8_t *)message, spare_block) && "Encountered bit error when decoding unmodified page");
     
     // test on a block by block level
     // test single bit flips
@@ -455,20 +451,20 @@ void test_page_decode() {
         int bit_number = j % 8;
 
         // flip the spare block bit
-        spare_region[block_number] ^= 1 << (8 - 1 - bit_number);
+        spare_block[block_number] ^= 1 << (8 - 1 - bit_number);
 
-        assert(decode_page((uint8_t *)message, spare_region) && "Page cannot be decoded if a single parity bit is flipped");
+        assert(eal_check_page((uint8_t *)message, spare_block) && "Page cannot be decoded if a single parity bit is flipped");
         assert(check_array(message) && "Original message is not preserved when a single parity bit is flipped");
 
         // correct the spare region, the decode page function does not correct that
-        spare_region[block_number] ^= 1 << (8 - 1 - bit_number);
+        spare_block[block_number] ^= 1 << (8 - 1 - bit_number);
     }
 
     // test flipping any bit from the data section
     for (int k = 0; k < NUM_32_BIT_COLS_IN_BLOCK; ++k) {
         for (int j = 0; j < 32; ++j) {
             message[k] ^= 1 << (32 - 1 - j);
-            assert(decode_page((uint8_t *)message, spare_region) && "Page cannot be decoded if a single data bit is flipped");
+            assert(eal_check_page((uint8_t *)message, spare_block) && "Page cannot be decoded if a single data bit is flipped");
             assert(check_array(message) && "Original message is not preserved when a single data bit is flipped");
         }
     }
@@ -482,19 +478,19 @@ void test_page_decode() {
 
             int o_block_number = blk_idx / 8;
             int o_bit_number = blk_idx % 8;
-            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+            spare_block[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
 
             for (int j = i + 1; j < 10; ++j) {
                 int j_blk_idx = blk_idx + 1;
                 int j_block_number = j_blk_idx / 8;
                 int j_bit_number = j_blk_idx % 8;
 
-                spare_region[j_block_number] ^= 1 << (8 - 1 - j_bit_number);
-                assert(!decode_page((uint8_t *)message, spare_region) && "Page cannot be decoded if a data bit is flipped and a single parity bit is flipped");
-                spare_region[j_block_number] ^= 1 << (8 - 1 - j_bit_number);
+                spare_block[j_block_number] ^= 1 << (8 - 1 - j_bit_number);
+                assert(!eal_check_page((uint8_t *)message, spare_block) && "Page cannot be decoded if a data bit is flipped and a single parity bit is flipped");
+                spare_block[j_block_number] ^= 1 << (8 - 1 - j_bit_number);
             }
 
-            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+            spare_block[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
         }
 
         // flip parity bit and data bit
@@ -503,18 +499,18 @@ void test_page_decode() {
 
             int o_block_number = blk_idx / 8;
             int o_bit_number = blk_idx % 8;
-            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+            spare_block[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
 
             // test flipping any bit from the data section
             for (int k = 0; k < NUM_32_BIT_COLS_IN_BLOCK; ++k) {
                 for (int j = 0; j < 32; ++j) {
                     message[z * NUM_32_BIT_COLS_IN_BLOCK + k] ^= 1 << (32 - 1 - j);
-                    assert(!decode_page((uint8_t *)message, spare_region) && "Page cannot be decoded if a single data bit is flipped");
+                    assert(!eal_check_page((uint8_t *)message, spare_block) && "Page cannot be decoded if a single data bit is flipped");
                     message[z * NUM_32_BIT_COLS_IN_BLOCK + k] ^= 1 << (32 - 1 - j);
                 }
             }
 
-            spare_region[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
+            spare_block[o_block_number] ^= 1 << (8 - 1 - o_bit_number);
         }
     }
 }
@@ -539,10 +535,8 @@ bool check_array(uint32_t decoded_message[]) {
     return true;
 }
 
-bool check_spare(uint8_t spare_region[162]) {
-    assert(spare_region[0] == SPARE_MAGIC && "Spare region at start was overridden");
+bool check_spare(uint8_t *spare_region) {
     assert(spare_region[161] == SPARE_MAGIC && "Spare region at end was overridden");
-    spare_region += 1;
 
     uint8_t expected_spare[160] = {
         0b11001110, 0b11110011, 0b10111100, 0b11101111, 0b00111011,
